@@ -1,0 +1,26 @@
+[package]
+name = "apex"
+version = "0.1.0"
+edition = "2024"
+authors = ["Riadh Chelbi <rrchelbi+github@gmail.com>"]
+description = "A fast, lightweight DNS server written in Rust"
+license = "MIT"
+readme = "README.md"
+epository = "https://github.com/rrchelbi/apex"
+keywords = ["dns", "server", "networking", "resolver"]
+categories = ["network-programming", "command-line-utilities"]
+
+
+[dependencies]
+anyhow = "1.0.102"
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
