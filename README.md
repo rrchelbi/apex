@@ -2,15 +2,11 @@
 
 A DNS server built from scratch in Rust.
 
----
-
 ## what it does
 
 Parses raw DNS packets from the wire, resolves queries recursively, and responds — no dependencies on system resolvers.
 
 Built on top of a hand-rolled byte buffer parser that speaks RFC 1035 directly.
-
----
 
 ## quick start
 
@@ -28,8 +24,6 @@ To test it:
 dig @127.0.0.1 -p 2053 google.com
 ```
 
----
-
 ## build
 
 ```bash
@@ -42,15 +36,11 @@ cargo build --release
 
 Binary lands at `target/release/oxidns`.
 
----
-
 ## stack
 
 | crate    | why               |
 | -------- | ----------------- |
 | `anyhow` | error propagation |
-
----
 
 ## status
 
@@ -61,8 +51,6 @@ early stage. currently handles:
 - [ ] recursive resolution
 - [ ] AAAA, MX, CNAME records
 - [ ] caching
-
----
 
 ## license
 
