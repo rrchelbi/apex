@@ -34,7 +34,7 @@ cargo build
 cargo build --release
 ```
 
-Binary lands at `target/release/oxidns`.
+Binary lands at `target/release/apex`.
 
 ## stack
 
