@@ -13,6 +13,7 @@ categories = ["network-programming", "command-line-utilities"]
 
 [dependencies]
 anyhow = "1.0.102"
+tracing = "0.1.44"
 
 [profile.dev]
 opt-level = 0

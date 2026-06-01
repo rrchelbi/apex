@@ -23,4 +23,11 @@ impl Question {
         let _class = buffer.read_u16()?; // class field, ignored for now
         Ok(())
     }
+
+    pub fn write(&mut self, pb: &mut PacketBuffer) -> Result<()> {
+        pb.write_qname(&self.name)?;
+        pb.write_u16(self.qtype.into())?;
+        pb.write_u16(1)?; // class IN
+        Ok(())
+    }
 }

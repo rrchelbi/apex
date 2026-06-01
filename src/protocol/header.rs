@@ -52,10 +52,10 @@ impl Header {
         Self::default()
     }
 
-    pub fn read(&mut self, buffer: &mut PacketBuffer) -> Result<()> {
-        self.id = buffer.read_u16()?;
+    pub fn read(&mut self, pb: &mut PacketBuffer) -> Result<()> {
+        self.id = pb.read_u16()?;
 
-        let flags = buffer.read_u16()?;
+        let flags = pb.read_u16()?;
         let [a, b] = flags.to_be_bytes();
 
         self.is_response = (a & 0b1000_0000) != 0;
@@ -70,10 +70,36 @@ impl Header {
         self.checking_disabled = (b & 0b0001_0000) != 0;
         self.result_code = ResultCode::from(b & 0b0000_1111);
 
-        self.question_count = buffer.read_u16()?;
-        self.answer_count = buffer.read_u16()?;
-        self.authority_count = buffer.read_u16()?;
-        self.additional_count = buffer.read_u16()?;
+        self.question_count = pb.read_u16()?;
+        self.answer_count = pb.read_u16()?;
+        self.authority_count = pb.read_u16()?;
+        self.additional_count = pb.read_u16()?;
+
+        Ok(())
+    }
+
+    pub fn write(&self, pb: &mut PacketBuffer) -> Result<()> {
+        pb.write_u16(self.id)?;
+
+        let a = (self.recursion_desired as u8)
+            | ((self.truncated as u8) << 1)
+            | ((self.authoritative as u8) << 2)
+            | (self.opcode << 3)
+            | ((self.is_response as u8) << 7);
+
+        let b = (self.result_code as u8)
+            | ((self.checking_disabled as u8) << 4)
+            | ((self.authenticated_data as u8) << 5)
+            | ((self.z as u8) << 6)
+            | ((self.recursion_available as u8) << 7);
+
+        pb.write(a)?;
+        pb.write(b)?;
+
+        pb.write_u16(self.question_count)?;
+        pb.write_u16(self.answer_count)?;
+        pb.write_u16(self.authority_count)?;
+        pb.write_u16(self.additional_count)?;
 
         Ok(())
     }

@@ -45,4 +45,28 @@ impl Packet {
     pub fn new() -> Self {
         Self::default()
     }
+
+    pub fn write(&mut self, pb: &mut PacketBuffer) -> Result<()> {
+        self.header.question_count = self.questions.len() as u16;
+        self.header.answer_count = self.answers.len() as u16;
+        self.header.authority_count = self.authorities.len() as u16;
+        self.header.additional_count = self.additionals.len() as u16;
+
+        self.header.write(pb)?;
+
+        for question in &mut self.questions {
+            question.write(pb)?;
+        }
+
+        for rec in self
+            .answers
+            .iter()
+            .chain(&self.authorities)
+            .chain(&self.additionals)
+        {
+            rec.write(pb)?;
+        }
+
+        Ok(())
+    }
 }

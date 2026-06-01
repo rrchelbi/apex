@@ -1,5 +1,7 @@
-use std::net::Ipv4Addr;
 use anyhow::Result;
+use std::net::Ipv4Addr;
+use tracing;
+
 
 use super::{PacketBuffer, QueryType};
 
@@ -36,8 +38,35 @@ impl Record {
             }
             QueryType::Unknown(_) => {
                 buffer.step(data_len as usize)?;
-                Ok(Self::Unknown { domain, qtype: qtype_num, data_len, ttl })
+                Ok(Self::Unknown {
+                    domain,
+                    qtype: qtype_num,
+                    data_len,
+                    ttl,
+                })
             }
         }
+    }
+
+    pub fn write(&self, pb: &mut PacketBuffer) -> Result<usize> {
+        let start_pos = pb.pos();
+
+        match self {
+            Self::A { domain, addr, ttl } => {
+                pb.write_qname(domain)?;
+                pb.write_u16(QueryType::A.into())?;
+                pb.write_u16(1)?; // class IN
+                pb.write_u32(*ttl)?;
+                pb.write_u16(4)?; // ipv4 addr length in bytes
+                for byte in addr.octets() {
+                    pb.write(byte)?;
+                }
+            }
+            Self::Unknown { .. } => {
+                tracing::warn!("skipping unknown record: {:?}", self);
+            }
+        }
+
+        Ok(pb.pos() - start_pos)
     }
 }

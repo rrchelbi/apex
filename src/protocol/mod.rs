@@ -139,4 +139,99 @@ impl PacketBuffer {
 
         Ok(())
     }
+
+    pub fn write(&mut self, val: u8) -> Result<()> {
+        *self
+            .buf
+            .get_mut(self.pos)
+            .context("write past end of buffer")? = val;
+        self.pos += 1;
+        Ok(())
+    }
+
+    pub fn write_u16(&mut self, val: u16) -> Result<()> {
+        for byte in val.to_be_bytes() {
+            self.write(byte)?;
+        }
+        Ok(())
+    }
+
+    pub fn write_u32(&mut self, val: u32) -> Result<()> {
+        for byte in val.to_be_bytes() {
+            self.write(byte)?;
+        }
+        Ok(())
+    }
+
+    pub fn write_qname(&mut self, qname: &str) -> Result<()> {
+        for label in qname.split('.') {
+            let len = label.len();
+            if len > 0x3F {
+                bail!("label exceeds 63 characters: {:?}", label);
+            }
+            self.write(len as u8)?;
+            for &byte in label.as_bytes() {
+                self.write(byte)?;
+            }
+        }
+        self.write(0)?; // root label terminator
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_write_then_read_u16() {
+        const DATA: u16 = 0x1234;
+        let mut pb = PacketBuffer::new();
+        pb.write_u16(DATA).unwrap();
+        pb.seek(0).unwrap();
+        assert_eq!(pb.read_u16().unwrap(), DATA);
+    }
+
+    #[test]
+    fn test_write_then_read_u32() {
+        const DATA: u32 = 0xDEADBEEF;
+        let mut pb = PacketBuffer::new();
+        pb.write_u32(DATA).unwrap();
+        pb.seek(0).unwrap();
+        assert_eq!(pb.read_u32().unwrap(), DATA);
+    }
+
+    #[test]
+    fn test_read_past_end_returns_err() {
+        let mut pb = PacketBuffer::new();
+        pb.seek(511).unwrap();
+        pb.read().unwrap(); // last valid byte
+        assert!(pb.read().is_err()); // should fail
+    }
+
+    #[test]
+    fn test_write_past_end_returns_err() {
+        let mut pb = PacketBuffer::new();
+        pb.seek(511).unwrap();
+        pb.write(0xFF).unwrap(); // last valid byte
+        assert!(pb.write(0xFF).is_err()); // should fail
+    }
+
+    #[test]
+    fn test_get_out_of_bounds_returns_none() {
+        let pb = PacketBuffer::new();
+        assert!(pb.get(512).is_none());
+        assert!(pb.get(511).is_some());
+    }
+
+    #[test]
+    fn test_qname_roundtrip() {
+        const QNAME: &'static str = "google.com";
+        let mut pb = PacketBuffer::new();
+        pb.write_qname(QNAME).unwrap();
+        pb.seek(0).unwrap();
+        let mut out = String::new();
+        pb.read_qname(&mut out).unwrap();
+        assert_eq!(out, QNAME);
+    }
 }
