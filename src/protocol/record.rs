@@ -21,23 +21,23 @@ pub enum Record {
 }
 
 impl Record {
-    pub fn read(buffer: &mut PacketBuffer) -> Result<Self> {
+    pub fn read(pb: &mut PacketBuffer) -> Result<Self> {
         let mut domain = String::new();
-        buffer.read_qname(&mut domain)?;
+        pb.read_qname(&mut domain)?;
 
-        let qtype_num = buffer.read_u16()?;
+        let qtype_num = pb.read_u16()?;
         let qtype = QueryType::from(qtype_num);
-        let _class = buffer.read_u16()?;
-        let ttl = buffer.read_u32()?;
-        let data_len = buffer.read_u16()?;
+        let _class = pb.read_u16()?;
+        let ttl = pb.read_u32()?;
+        let data_len = pb.read_u16()?;
 
         match qtype {
             QueryType::A => {
-                let addr = Ipv4Addr::from(buffer.read_u32()?);
+                let addr = Ipv4Addr::from(pb.read_u32()?);
                 Ok(Self::A { domain, addr, ttl })
             }
             QueryType::Unknown(_) => {
-                buffer.step(data_len as usize)?;
+                pb.step(data_len as usize)?;
                 Ok(Self::Unknown {
                     domain,
                     qtype: qtype_num,
