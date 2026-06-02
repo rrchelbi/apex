@@ -40,6 +40,18 @@ impl PacketBuffer {
         Ok(())
     }
 
+    fn set(&mut self, pos: usize, val: u8) -> Result<()> {
+        *self.buf.get_mut(pos).context("set out of bounds")? = val;
+        Ok(())
+    }
+
+    fn set_u16(&mut self, pos: usize, val: u16) -> Result<()> {
+        let [hi, lo] = val.to_be_bytes();
+        self.set(pos, hi)?;
+        self.set(pos + 1, lo)?;
+        Ok(())
+    }
+
     pub fn seek(&mut self, pos: usize) -> Result<()> {
         if pos < BUF_SIZE {
             self.pos = pos;

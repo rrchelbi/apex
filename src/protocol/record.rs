@@ -1,7 +1,6 @@
 use anyhow::Result;
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, Ipv6Addr};
 use tracing;
-
 
 use super::{PacketBuffer, QueryType};
 
@@ -16,6 +15,27 @@ pub enum Record {
     A {
         domain: String,
         addr: Ipv4Addr,
+        ttl: u32,
+    },
+    NS {
+        domain: String,
+        host: String,
+        ttl: u32,
+    },
+    CNAME {
+        domain: String,
+        host: String,
+        ttl: u32,
+    },
+    MX {
+        domain: String,
+        priority: u16,
+        host: String,
+        ttl: u32,
+    },
+    AAAA {
+        domain: String,
+        addr: Ipv6Addr,
         ttl: u32,
     },
 }
@@ -35,6 +55,43 @@ impl Record {
             QueryType::A => {
                 let addr = Ipv4Addr::from(pb.read_u32()?);
                 Ok(Self::A { domain, addr, ttl })
+            }
+            QueryType::AAAA => {
+                let addr = Ipv6Addr::from([
+                    pb.read_u16()?,
+                    pb.read_u16()?,
+                    pb.read_u16()?,
+                    pb.read_u16()?,
+                    pb.read_u16()?,
+                    pb.read_u16()?,
+                    pb.read_u16()?,
+                    pb.read_u16()?,
+                ]);
+                Ok(Self::AAAA { domain, addr, ttl })
+            }
+
+            QueryType::NS => {
+                let mut host = String::new();
+                pb.read_qname(&mut host)?;
+                Ok(Self::NS { domain, host, ttl })
+            }
+
+            QueryType::CNAME => {
+                let mut host = String::new();
+                pb.read_qname(&mut host)?;
+                Ok(Self::CNAME { domain, host, ttl })
+            }
+
+            QueryType::MX => {
+                let priority = pb.read_u16()?;
+                let mut host = String::new();
+                pb.read_qname(&mut host)?;
+                Ok(Self::MX {
+                    domain,
+                    priority,
+                    host,
+                    ttl,
+                })
             }
             QueryType::Unknown(_) => {
                 pb.step(data_len as usize)?;
@@ -57,11 +114,55 @@ impl Record {
                 pb.write_u16(QueryType::A.into())?;
                 pb.write_u16(1)?; // class IN
                 pb.write_u32(*ttl)?;
-                pb.write_u16(4)?; // ipv4 addr length in bytes
+                pb.write_u16(4)?; // ipv4 = 4 bytes
                 for byte in addr.octets() {
                     pb.write(byte)?;
                 }
             }
+
+            Self::AAAA { domain, addr, ttl } => {
+                pb.write_qname(domain)?;
+                pb.write_u16(QueryType::AAAA.into())?;
+                pb.write_u16(1)?; // class IN
+                pb.write_u32(*ttl)?;
+                pb.write_u16(16)?; // ipv6 = 16 bytes
+                for segment in addr.segments() {
+                    pb.write_u16(segment)?;
+                }
+            }
+
+            Self::NS { domain, host, ttl } => {
+                pb.write_qname(domain)?;
+                pb.write_u16(QueryType::NS.into())?;
+                pb.write_u16(1)?; // class IN
+                pb.write_u32(*ttl)?;
+                write_with_length_prefix(pb, |buf| buf.write_qname(host))?;
+            }
+
+            Self::CNAME { domain, host, ttl } => {
+                pb.write_qname(domain)?;
+                pb.write_u16(QueryType::CNAME.into())?;
+                pb.write_u16(1)?; // class IN
+                pb.write_u32(*ttl)?;
+                write_with_length_prefix(pb, |buf| buf.write_qname(host))?;
+            }
+
+            Self::MX {
+                domain,
+                priority,
+                host,
+                ttl,
+            } => {
+                pb.write_qname(domain)?;
+                pb.write_u16(QueryType::MX.into())?;
+                pb.write_u16(1)?; // class IN
+                pb.write_u32(*ttl)?;
+                write_with_length_prefix(pb, |buf| {
+                    buf.write_u16(*priority)?;
+                    buf.write_qname(host)
+                })?;
+            }
+
             Self::Unknown { .. } => {
                 tracing::warn!("skipping unknown record: {:?}", self);
             }
@@ -69,4 +170,18 @@ impl Record {
 
         Ok(pb.pos() - start_pos)
     }
+}
+
+/// Writes a u16 length-prefixed block. Reserves 2 bytes for the length,
+/// runs the writer, then backfills the actual byte count.
+fn write_with_length_prefix<F>(buffer: &mut PacketBuffer, writer: F) -> Result<()>
+where
+    F: FnOnce(&mut PacketBuffer) -> Result<()>,
+{
+    let len_pos = buffer.pos();
+    buffer.write_u16(0)?; // placeholder
+    writer(buffer)?;
+    let data_len = buffer.pos() - (len_pos + 2);
+    buffer.set_u16(len_pos, data_len as u16)?;
+    Ok(())
 }
