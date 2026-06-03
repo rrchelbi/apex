@@ -5,6 +5,7 @@ mod question;
 mod record;
 
 pub use header::Header;
+pub use header::ResultCode;
 pub use packet::Packet;
 pub use query::QueryType;
 pub use question::Question;

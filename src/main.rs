@@ -1,18 +1,18 @@
 use anyhow::Result;
-use apex::protocol::{Packet, PacketBuffer};
-use std::{fs::File, io::Read};
+use tracing_subscriber;
+
+mod server;
 
 fn main() -> Result<()> {
-    let mut file = File::open("/tmp/response_packet.txt")?;
-    let mut pb = PacketBuffer::new();
-    file.read(&mut pb.buf)?;
+    tracing_subscriber::fmt()
+        .with_line_number(true)
+        .with_thread_ids(true)
+        .with_file(true)
+        .with_target(true)
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
 
-    let packet = Packet::try_from(&mut pb)?;
-    println!("{:#?}", packet.header);
-
-    for q in packet.questions {
-        println!("{:#?}", q);
-    }
+    server::run("0.0.0.0:2053")?;
 
     Ok(())
 }
