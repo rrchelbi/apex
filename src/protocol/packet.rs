@@ -1,3 +1,5 @@
+use std::net::Ipv4Addr;
+
 use super::{Header, PacketBuffer, QueryType, Question, Record};
 use anyhow::Result;
 
@@ -68,5 +70,47 @@ impl Packet {
         }
 
         Ok(())
+    }
+
+    /// Pick the first A record from the answer section.
+    /// When multiple IPs are returned for a name, any one is equally valid.
+    pub fn get_random_a(&self) -> Option<Ipv4Addr> {
+        self.answers.iter().find_map(|record| match record {
+            Record::A { addr, .. } => Some(*addr),
+            _ => None,
+        })
+    }
+
+    /// Iterator over all NS records in the authority section that are
+    /// authoritative for `qname`, yielded as `(domain, host)` tuples.
+    fn get_ns<'a>(&'a self, qname: &'a str) -> impl Iterator<Item = (&'a str, &'a str)> {
+        self.authorities
+            .iter()
+            .filter_map(|record| match record {
+                Record::NS { domain, host, .. } => Some((domain.as_str(), host.as_str())),
+                _ => None,
+            })
+            .filter(move |(domain, _)| qname.ends_with(*domain))
+    }
+
+    /// Returns the IP of a name server from the authority section if its
+    /// A record was bundled in the additional section.
+    pub fn get_resolved_ns(&self, qname: &str) -> Option<Ipv4Addr> {
+        self.get_ns(qname)
+            .flat_map(|(_, host)| {
+                self.additionals
+                    .iter()
+                    .filter_map(move |record| match record {
+                        Record::A { domain, addr, .. } if domain == host => Some(*addr),
+                        _ => None,
+                    })
+            })
+            .next()
+    }
+
+    /// Returns the hostname of a name server from the authority section
+    /// when no resolved IP is available — triggers a recursive NS lookup.
+    pub fn get_unresolved_ns<'a>(&'a self, qname: &'a str) -> Option<&'a str> {
+        self.get_ns(qname).map(|(_, host)| host).next()
     }
 }
