@@ -22,35 +22,51 @@ To test it:
 
 ```bash
 dig @127.0.0.1 -p 2053 google.com
+dig @127.0.0.1 -p 2053 google.com AAAA
+dig @127.0.0.1 -p 2053 gmail.com MX
+```
+
+To see the full resolution trace:
+
+```bash
+RUST_LOG=debug cargo run
+```
+
+```bash
+INFO apex: listening on 0.0.0.0:2053
+INFO apex: received query: DnsQuestion { name: "google.com", qtype: A }
+DEBUG apex: looking up A google.com via 198.41.0.4
+DEBUG apex: looking up A google.com via 216.239.34.10
+DEBUG apex: answer: A { domain: "google.com", addr: 142.250.185.46, ttl: 207 }
 ```
 
 ## build
 
 ```bash
-# dev
-cargo build
-
-# release
-cargo build --release
+cargo build --release          # target/release/apex
+cargo install --path .         # install globally
 ```
-
-Binary lands at `target/release/apex`.
 
 ## stack
 
-| crate    | why               |
-| -------- | ----------------- |
-| `anyhow` | error propagation |
+| crate                | why                  |
+| -------------------- | -------------------- |
+| `anyhow`             | error propagation    |
+| `tracing`            | structured logging   |
+| `tracing-subscriber` | `RUST_LOG` filtering |
 
 ## status
 
 early stage. currently handles:
 
-- [x] packet parsing (header, question, answer sections)
-- [x] A record resolution
-- [ ] recursive resolution
-- [ ] AAAA, MX, CNAME records
-- [ ] caching
+- [x] zero-copy wire format parser and serializer
+- [x] A, AAAA, NS, CNAME, MX record support
+- [x] recursive resolution from root servers
+- [x] unknown record passthrough
+- [ ] TTL caching
+- [ ] concurrent query handling
+- [ ] authoritative mode / zone files
+- [ ] DoT / DoH
 
 ## license
 
